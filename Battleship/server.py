@@ -1,0 +1,90 @@
+
+import msvcrt
+import time
+import socket
+import threading
+import select
+
+timeout = 1.0
+
+should_exit = threading.Event()
+waiting_for_response = threading.Event()
+
+def quit_listener(conn):
+    while not should_exit.is_set():
+        waiting_for_response.wait()  # Wait until waiting phase starts
+        if msvcrt.kbhit():
+            key = msvcrt.getwch()
+            if key.lower() != 'q':
+                continue
+        else:
+            continue
+
+
+        print("[SERVER] Quitting early...")
+        try:
+            conn.sendall("quit".encode())
+        except:
+            pass
+        
+        should_exit.set()
+        waiting_for_response.clear()  # Stop listening until next wait phase
+
+def main():
+    HOST = '0.0.0.0'
+    PORT = 65432
+
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((HOST, PORT))
+    server_socket.listen()
+
+
+    print(f"[SERVER] Waiting for connection on {HOST}:{PORT}")
+    conn, addr = server_socket.accept()
+    print(f"[SERVER] Connected by {addr}")
+
+
+    ready, _, _ = select.select([conn], [], [], timeout)
+
+    threading.Thread(target=quit_listener, args=(conn,), daemon=True).start()
+    
+    inputBuffer = []
+    try:
+        while not should_exit.is_set():
+            # Server sends move
+            move = input("Your move (or 'quit'): ")
+            if move.lower() == "quit":
+                conn.sendall("quit".encode())
+                should_exit.set()
+                break
+            conn.sendall(move.encode())
+
+            # Server waits for client response
+            print("[SERVER] Waiting for client response...")
+            waiting_for_response.set()  # Start listening for quit input during wait
+            try:
+                data = conn.recv(1024).decode()
+                waiting_for_response.clear()  # Stop listening after received data
+
+                if not data:
+                    print("[SERVER] Client disconnected.")
+                    should_exit.set()
+                    break
+                if data.lower() == "quit":
+                    print("[SERVER] Client quit.")
+                    should_exit.set()
+                    break
+                print(f"[CLIENT MOVE] {data}")
+
+            except Exception as e:
+                print(f"[SERVER] Error during recv: {e}")
+                should_exit.set()
+                break
+
+    finally:
+        conn.close()
+        server_socket.close()
+        print("[SERVER] Closed.")
+
+if __name__ == "__main__":
+    main()
