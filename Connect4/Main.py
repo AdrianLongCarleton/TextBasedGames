@@ -1,0 +1,243 @@
+#By: Adrian Long
+#Id: 101376444
+#Date: 2025-10-09
+#Licence: MIT
+#Required to cite me as an author if you use any of this code
+
+#I work on one text based game weekly, feel free to join and learn to code
+
+#This is a terminal based implementation of the connect four game.
+#The program starts by asking the users what their names will be, and telling them what colors they will be playing
+#Then the board prints and play starts, each user is asked which collumn they would like to drop their token in
+#and the token falls to the bottom. The game is over when there are no more moves that can be made, or one of the
+#players get's four tokens of their colour in a row, collumn or diagonal
+
+import random
+
+symbols = ["_|","🔴","🔵"]
+
+#This is a fancy way to make an array with 6 rows, and 7 collumns
+board = [[0 for i in range(7)] for i in range(6)]
+
+#Decalre a function
+#When we call printBoard() the code inside the function will run and print a board to the screen
+def printBoard():
+    #Print the numbers of the collumns the user can select
+    print("\n|1|2|3|4|5|6|7|")
+
+    #The board is 6 tall so loop through each row
+    for row in range(6):
+        #Declare a variable to hold the text composing the current line
+        line = "|"
+
+        #The board is 7 wide so loop through each collumn
+        for col in range(7):
+
+            #The board is a 7 by 6 array that holds values in the range 0 to 2
+            symbolNumber = board[row][col]
+
+            #The symbols array holds the text we want to print
+            #symbols[0] is "_|", symbols[1] is "🔴", and symbols[2] is "🔵"
+            symbol = symbols[symbolNumber]
+            
+            #Add the symbol to the end of the current line
+            line += symbol
+
+        #Print the current line
+        print(line)
+
+    #Print an empty line for spacing
+    print()
+
+#This is a recursive counting algorythm
+#Recursion is when a function calls itself
+#The depth argument is used only for debuging
+#This function returns the count of the target token type in the given direction <vec>
+def countToken(pos,vec,token: int, depth: int) -> int:
+
+    #The new position is the old position plus the direction vector <vec>
+    pos = [pos[0] + vec[0],pos[1] + vec[1]]
+    
+    #Found zero tokens of the <token> color because <pos> is not in bounds
+    if pos[0] < 0 or pos[0] > 5 or pos[1] < 0 or pos[1] > 6:
+
+        #The result of this function is zero
+        return 0
+    
+    #The following line can be uncomented for debuging win detection
+    #print(depth, pos, vec, symbols[board[pos[0]][pos[1]]], symbols[token])
+
+    #If the value in <board> at the position <pos> is the same as the <token> value
+    if board[pos[0]][pos[1]] == token:
+        #Then return 1 plus the number of any additional tokens of the same colour that can
+        #be found in the <vec> direction
+        #depth is increased by one so you know how deep on the call stack the function is
+        return 1 + countToken(pos,vec,token, depth + 1)
+    return 0
+
+def main():
+    #Greet the user
+    print("Welcome to connect 4!\n")
+    
+    #Create some initial names for the players in case they enter empty input
+    players = ["Player 1","Player 2"]
+
+    for i in range(2):
+        inputText = input(f"What is your name Player {i + 1}? ")
+        if inputText != "":
+            players[i] = inputText
+
+    if random.choice([True,False]):
+        temp = players[0]
+        players[0] = players[1]
+        players[1] = temp
+    
+    #Tell the players what colors they will be playing as and how to stop playing
+    print(f"\nYou will be playing with {symbols[1]} {players[0]}")
+    print(f"You will be playing with {symbols[2]} {players[1]}\n")
+    print("Type q or quit to stop playing.")
+    
+    #Print the inital board
+    printBoard()
+
+    #Keeping track of the turn count is usefull for determining if the game is a tie and
+    #whose token we should place
+    turn = 0
+
+    #<won> holds if the game has been won or not
+    won = False
+
+    #I chose an event controlled loop because there are only 42 possible moves in a connect four game
+    #I could have looped 42 times, and used an event control loop to get valid input, but that would be more complex
+    #This is simpler because I can just restart turn number n, by calling continue and not increasing the turn number
+    while turn < 42:
+
+        #If we take the remainder of turn when we devide by 2, we get the player number
+        #If we add one to that value, then we get the symbolNumber/token of that player
+        playerNumber = turn % 2
+        token = playerNumber + 1
+
+        #Get the players move
+        inputText = input(f"What is your move {players[playerNumber]}? ")
+
+        #If they typed any string starting with q, that means they want to quit
+        if len(inputText) > 0 and inputText[0].lower() == "q":
+            break
+        
+        #Never trust the user's input.
+        #If the user entered a str instead of an integer, then python will exit with a ValueException because you
+        #can't convert a string to a number
+        col = 0
+
+        #To solve this we try the code
+        try:
+            #We subtract one from the user's input because they wan't the 1st slot.
+            #Computers however start counting at zero. So if they said 1st, we actually want the 0th
+            col = int(inputText) - 1
+
+        #And if it doesn't work
+        except:
+
+            #We restart and as for their input again
+            continue
+
+        #Another thing the user could do is try to play a move that is not on the board.
+        #We constrain the user's input to the range [0,6] because again 6 for a computer means 7 for a human
+        col = max(0,col)
+        col = min(6,col)
+
+        #If the player tried to add a token to a full collumn
+        if board[0][col] != 0:
+            
+            #Notify the player
+            print("That column is full! Try a different one.")
+
+            #Restart the loop and get a new input
+            continue
+        
+        #Drop the token
+        #Find the first row, at collumn <col> that is not empty
+        #We are going to pretend a seventh row exists, and that it is always full
+        row = 0
+        for row in range(7):
+
+            #If the row number is still technically on the board, and the token at <row> <col> on the board is empty
+            if row < 6 and board[row][col] == 0:
+                #Then you haven't found it yet. Keep looking
+                continue
+
+            #Must be at a row that is full in this collumn
+            #The row above is the empty one so we subtract one
+            row -= 1
+
+            #Set the <row> <col> position on the board to the <token>
+            board[row][col] = token
+
+            #We can stop looking for empty cell's, there won't be any
+            break
+
+        
+        pos = [row,col]
+        #vectors stores the left, up-left, up, and up-right directions
+        vectors = [[-1,0],[-1,-1],[0,-1],[-1,1]]
+        
+        #Detect a win
+        #loop through all the directions
+        for vec in vectors:
+            #The the current position must be out token
+            count = 1
+            
+            #How many of our token's are in the direction <vec>?
+            left = countToken(pos,vec,token,0)
+
+            #How many of out token's are in the opposite direction of <vec>?
+            right = countToken(pos,(-1 * vec[0], -1 * vec[1]),token, 0) 
+
+            #Sum all the counted tokens
+            count += left
+            count += right
+
+            #The following line can be used for debuging
+            #print(count,left,right)
+
+            #If the number of tokens in the row are >= 4
+            if count >= 4:
+
+                #Then the game has been won break out of the event controlled loop
+                won = True
+                break
+        
+        #We are at the end of the event controlled loop, meaning that a move has been made succesfully
+        #Increase the turn count, and print the modified board
+        turn += 1
+        printBoard()
+        
+        #We also break out of the event controlled loop if somebody won
+        if won:
+            break
+    
+   
+    if not won:
+
+        boardIsFull = turn > 42
+
+        if boardIsFull:
+
+            print("It was a tie!")
+
+            return
+
+        print("Aww, maybe you'll finish the game next time.")
+
+        return
+    
+    #The turn number is off by one because we incremented it by one on the last loop
+    turn -= 1
+
+    #Announce who won
+    print(f"Congratuations {players[turn % 2]}, you won with {symbols[turn % 2 + 1]}")
+
+#Start the program
+main()
+#^^^^^^^^^^^^^^^^^
+#If you don't write this at the end nothing will happen
